@@ -13,9 +13,16 @@ const Login = () => {
 
   useEffect(() => {
     // Check if user is already logged in
-    const user = localStorage.getItem('user');
-    if (user) {
-      navigate('/dashboard');
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user && user.token) {
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        localStorage.removeItem('user');
+      }
     }
   }, [navigate]);
 
@@ -34,7 +41,14 @@ const Login = () => {
 
     try {
       const response = await authService.login(formData.email, formData.password);
-      console.log('Login successful:', response);
+      
+      // Store user data in localStorage
+      localStorage.setItem('user', JSON.stringify({
+        token: response.token,
+        ...response.user
+      }));
+
+      // Navigate to dashboard
       navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
@@ -102,30 +116,34 @@ const Login = () => {
               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
             >
               {loading ? (
-                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <svg
-                    className="animate-spin h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                </span>
-              ) : null}
-              {loading ? 'Signing in...' : 'Sign in'}
+                <>
+                  <span className="absolute left-0 inset-y-0 flex items-center pl-3">
+                    <svg
+                      className="animate-spin h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  </span>
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                'Sign in'
+              )}
             </button>
           </div>
         </form>

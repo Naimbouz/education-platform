@@ -10,8 +10,10 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: true
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(morgan('dev'));
@@ -47,13 +49,13 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/education
     useUnifiedTopology: true
 })
 .then(() => {
-  console.log('MongoDB connected successfully');
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-  });
+    console.log('MongoDB connected successfully');
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
 })
-.catch((err) => {
-  console.log('MongoDB connection error:', err);
-  process.exit(1);
+.catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
 });
