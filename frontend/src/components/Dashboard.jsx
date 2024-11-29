@@ -108,7 +108,7 @@ const Dashboard = () => {
               <h2 className="text-2xl font-bold text-gray-900">Your Courses</h2>
               {user.role === 'teacher' && (
                 <button
-                  onClick={() => navigate('/create-course')}
+                  onClick={() => navigate('/courses/create')}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
                   Create New Course
