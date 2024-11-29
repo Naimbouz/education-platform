@@ -3,6 +3,16 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const auth = require('../middleware/auth');
+
+// Helper function to generate JWT token
+const generateToken = (userId) => {
+    return jwt.sign(
+        { id: userId },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '30d' }
+    );
+};
 
 // @route   POST /api/auth/register
 // @desc    Register a user
@@ -31,12 +41,8 @@ router.post('/register', async (req, res) => {
 
         await user.save();
 
-        // Create token
-        const token = jwt.sign(
-            { id: user._id },
-            process.env.JWT_SECRET || 'secret',
-            { expiresIn: '30d' }
-        );
+        // Generate token
+        const token = generateToken(user._id);
 
         res.status(201).json({
             success: true,
@@ -73,12 +79,8 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        // Create token
-        const token = jwt.sign(
-            { id: user._id },
-            process.env.JWT_SECRET || 'secret',
-            { expiresIn: '30d' }
-        );
+        // Generate token
+        const token = generateToken(user._id);
 
         // Remove password from response
         user.password = undefined;
@@ -102,7 +104,7 @@ router.post('/login', async (req, res) => {
 // @route   GET /api/auth/me
 // @desc    Get current user
 // @access  Private
-router.get('/me', async (req, res) => {
+router.get('/me', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
         res.json(user);

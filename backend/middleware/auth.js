@@ -1,35 +1,36 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-exports.protect = async (req, res, next) => {
-    let token;
-
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
-    }
-
-    if (!token) {
-        return res.status(401).json({ message: 'Not authorized to access this route' });
-    }
-
+const auth = async (req, res, next) => {
     try {
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+        // Get token from header
+        const token = req.header('Authorization')?.replace('Bearer ', '');
 
-        req.user = await User.findById(decoded.id);
-        next();
+        if (!token) {
+            return res.status(401).json({ message: 'No token, authorization denied' });
+        }
+
+        try {
+            // Verify token
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+            
+            // Get user from database
+            const user = await User.findById(decoded.id);
+            
+            if (!user) {
+                return res.status(401).json({ message: 'User not found' });
+            }
+
+            // Add user to request
+            req.user = user;
+            next();
+        } catch (error) {
+            res.status(401).json({ message: 'Token is not valid' });
+        }
     } catch (error) {
-        return res.status(401).json({ message: 'Not authorized to access this route' });
+        console.error('Auth middleware error:', error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 
-exports.authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({
-                message: `User role ${req.user.role} is not authorized to access this route`
-            });
-        }
-        next();
-    };
-};
+module.exports = auth;

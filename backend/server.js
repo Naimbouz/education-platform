@@ -13,6 +13,11 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Root route
+app.get('/', (req, res) => {
+    res.json({ message: 'Welcome to Education Platform API' });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
@@ -20,6 +25,17 @@ app.use('/api/courses', courseRoutes);
 // Test route
 app.get('/test', (req, res) => {
   res.json({ message: 'Backend is working!' });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: 'Something went wrong!' });
+});
+
+// Handle 404 routes
+app.use((req, res) => {
+    res.status(404).json({ message: 'Route not found' });
 });
 
 // MongoDB connection
