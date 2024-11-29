@@ -145,4 +145,25 @@ router.get('/me', auth, async (req, res) => {
     }
 });
 
+// @route   GET /api/auth/students
+// @desc    Get all students (for teachers only)
+// @access  Private
+router.get('/students', auth, async (req, res) => {
+    try {
+        // Only teachers can view all students
+        if (req.user.role !== 'teacher') {
+            return res.status(403).json({ message: 'Access denied. Teachers only.' });
+        }
+
+        const students = await User.find({ role: 'student' })
+            .select('name email')
+            .sort({ name: 1 });
+
+        res.json(students);
+    } catch (error) {
+        console.error('Get students error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

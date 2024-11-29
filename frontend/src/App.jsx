@@ -6,6 +6,7 @@ import {
 } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import CourseDetails from './components/CourseDetails';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -26,6 +27,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Dashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/courses/:id',
+    element: (
+      <ProtectedRoute>
+        <CourseDetails />
       </ProtectedRoute>
     ),
   },

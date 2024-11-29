@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const Dashboard = () => {
@@ -8,11 +8,16 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [courses, setCourses] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
+  const [newCourse, setNewCourse] = useState({
+    title: '',
+    description: ''
+  });
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Get stored user data
         const storedUser = localStorage.getItem('user');
         console.log('Dashboard - Retrieved stored user data:', storedUser);
 
@@ -22,7 +27,6 @@ const Dashboard = () => {
           return;
         }
 
-        // Parse the stored user data
         const userData = JSON.parse(storedUser);
         console.log('Dashboard - Parsed user data:', userData);
 
@@ -33,10 +37,8 @@ const Dashboard = () => {
           return;
         }
 
-        // Set the authorization header
         axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
         
-        // Verify the token by making a request to /api/auth/me
         const response = await axios.get('http://localhost:5000/api/auth/me');
         console.log('Dashboard - Verified user data:', response.data);
 
@@ -45,11 +47,23 @@ const Dashboard = () => {
         }
 
         setUser(response.data.user);
+        
+        // Fetch courses
+        const coursesResponse = await axios.get('http://localhost:5000/api/courses');
+        setCourses(coursesResponse.data);
+
+        // If user is a teacher, fetch all students
+        if (response.data.user.role === 'teacher') {
+          const studentsResponse = await axios.get('http://localhost:5000/api/auth/students');
+          setStudents(studentsResponse.data);
+        }
+
         setLoading(false);
       } catch (error) {
         console.error('Dashboard - Auth check error:', error);
         localStorage.removeItem('user');
-        setError('Session expired. Please login again.');
+        setError('Authentication failed. Please login again.');
+        setLoading(false);
         navigate('/login');
       }
     };
@@ -57,136 +71,213 @@ const Dashboard = () => {
     checkAuth();
   }, [navigate]);
 
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const response = await axios.get('http://localhost:5000/api/courses');
-        setCourses(response.data);
-      } catch (err) {
-        if (err.response?.status === 401) {
-          localStorage.removeItem('user');
-          navigate('/login');
-        } else {
-          setError(err.response?.data?.message || 'Failed to fetch courses');
-        }
-      }
-    };
-
-    if (user) {
-      fetchCourses();
+  const handleCreateCourse = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('http://localhost:5000/api/courses', newCourse);
+      setCourses([...courses, response.data]);
+      setShowCreateCourseModal(false);
+      setNewCourse({ title: '', description: '' });
+    } catch (error) {
+      console.error('Create course error:', error);
+      setError(error.response?.data?.message || 'Failed to create course');
     }
-  }, [user, navigate]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      </div>
-    );
-  }
+  };
 
   const handleLogout = () => {
-    console.log('Logging out...');
     localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
     navigate('/login');
   };
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-gray-800">Education Platform</h1>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="ml-3 relative">
-                <div>
-                  <span className="text-gray-700 mr-4">Welcome, {user?.name}</span>
-                  <button
-                    onClick={handleLogout}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-                  >
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </div>
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Education Platform
+          </h1>
+          <div className="flex items-center gap-4">
+            <span className="text-gray-600">Welcome, {user?.name}</span>
+            <button
+              onClick={handleLogout}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+            >
+              Logout
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
-            {user?.role === 'teacher' ? (
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Teacher Dashboard */}
+        {user?.role === 'teacher' && (
+          <div>
+            <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold mb-4">Teacher Dashboard</h2>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">Your Courses</h2>
-                  <button
-                    onClick={() => navigate('/courses/create')}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Create New Course
-                  </button>
-                </div>
+                <h2 className="text-2xl font-bold text-gray-900">Teacher Dashboard</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Manage your courses and view all students
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCreateCourseModal(true)}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+              >
+                Create New Course
+              </button>
+            </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+              {/* Courses Section */}
+              <div>
+                <h3 className="text-xl font-semibold mb-4">Your Courses</h3>
                 {courses.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">
-                    No courses found.
-                    {' Click the "Create New Course" button to get started.'}
-                  </p>
+                  <p className="text-gray-600">No courses yet. Create your first course!</p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-4">
                     {courses.map((course) => (
-                      <div
-                        key={course._id}
-                        className="bg-white overflow-hidden shadow rounded-lg"
-                      >
-                        <div className="px-4 py-5 sm:p-6">
-                          <h3 className="text-lg font-medium text-gray-900">
-                            {course.title}
-                          </h3>
-                          <p className="mt-1 text-sm text-gray-600">
-                            {course.description}
-                          </p>
-                        </div>
-                        <div className="bg-gray-50 px-4 py-4 sm:px-6">
-                          <button
-                            onClick={() => navigate(`/courses/${course._id}`)}
-                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                      <div key={course._id} className="bg-white p-6 rounded-lg shadow-md">
+                        <h3 className="text-xl font-semibold mb-2">{course.title}</h3>
+                        <p className="text-gray-600 mb-4">{course.description}</p>
+                        <div className="flex justify-between items-center">
+                          <Link
+                            to={`/courses/${course._id}`}
+                            className="text-blue-600 hover:text-blue-800"
                           >
                             View Details →
-                          </button>
+                          </Link>
+                          <span className="text-sm text-gray-500">
+                            {course.students?.length || 0} students enrolled
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            ) : (
+
+              {/* All Students Section */}
               <div>
-                <h2 className="text-2xl font-bold mb-4">Student Dashboard</h2>
-                {/* Add student-specific content here */}
+                <h3 className="text-xl font-semibold mb-4">All Students</h3>
+                {students.length === 0 ? (
+                  <p className="text-gray-600">No students registered yet.</p>
+                ) : (
+                  <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <ul className="divide-y divide-gray-200">
+                      {students.map((student) => (
+                        <li key={student._id} className="p-4 hover:bg-gray-50">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="text-lg font-medium text-gray-900">{student.name}</h4>
+                              <p className="text-sm text-gray-500">{student.email}</p>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+          </div>
+        )}
+
+        {/* Student Dashboard */}
+        {user?.role === 'student' && (
+          <div>
+            <div className="px-4 py-5 sm:px-6">
+              <h2 className="text-2xl font-bold text-gray-900">Student Dashboard</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                View your enrolled courses and assignments
+              </p>
+            </div>
+
+            <div className="mt-8">
+              <h3 className="text-xl font-semibold mb-4">Your Courses</h3>
+              {courses.length === 0 ? (
+                <p className="text-gray-600">You are not enrolled in any courses yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {courses.map((course) => (
+                    <div key={course._id} className="bg-white p-6 rounded-lg shadow-md">
+                      <h3 className="text-xl font-semibold mb-2">{course.title}</h3>
+                      <p className="text-gray-600 mb-4">{course.description}</p>
+                      <Link
+                        to={`/courses/${course._id}`}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        View Details →
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Create Course Modal */}
+      {showCreateCourseModal && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4">Create New Course</h2>
+            <form onSubmit={handleCreateCourse}>
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={newCourse.title}
+                  onChange={(e) =>
+                    setNewCourse({ ...newCourse, title: e.target.value })
+                  }
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newCourse.description}
+                  onChange={(e) =>
+                    setNewCourse({ ...newCourse, description: e.target.value })
+                  }
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCourseModal(false)}
+                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                >
+                  Create Course
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
