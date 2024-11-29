@@ -1,34 +1,58 @@
 const express = require('express');
 const router = express.Router();
 const Course = require('../models/Course');
+const auth = require('../middleware/auth');
 
-// Get all courses
-router.get('/', async (req, res) => {
+// Helper function to check if user is teacher
+const isTeacher = (req, res, next) => {
+    if (req.user.role !== 'teacher') {
+        return res.status(403).json({ message: 'Only teachers can perform this action' });
+    }
+    next();
+};
+
+// @route   GET /api/courses
+// @desc    Get all courses
+// @access  Private
+router.get('/', auth, async (req, res) => {
     try {
-        const courses = await Course.find()
-            .populate('teacher', 'name email')
-            .populate('students', 'name email');
+        let courses;
+        if (req.user.role === 'teacher') {
+            courses = await Course.find({ teacher: req.user.id })
+                .populate('teacher', 'name email')
+                .populate('students', 'name email');
+        } else {
+            courses = await Course.find({ students: req.user.id })
+                .populate('teacher', 'name email')
+                .populate('students', 'name email');
+        }
         res.json(courses);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Get courses error:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Create a course
-router.post('/', async (req, res) => {
+// @route   POST /api/courses
+// @desc    Create a course
+// @access  Private (Teachers only)
+router.post('/', [auth, isTeacher], async (req, res) => {
     try {
         const course = await Course.create({
             ...req.body,
-            teacher: req.user.id // This will be set by auth middleware
+            teacher: req.user.id
         });
         res.status(201).json(course);
     } catch (error) {
+        console.error('Create course error:', error);
         res.status(400).json({ message: error.message });
     }
 });
 
-// Get single course
-router.get('/:id', async (req, res) => {
+// @route   GET /api/courses/:id
+// @desc    Get single course
+// @access  Private
+router.get('/:id', auth, async (req, res) => {
     try {
         const course = await Course.findById(req.params.id)
             .populate('teacher', 'name email')
@@ -37,49 +61,76 @@ router.get('/:id', async (req, res) => {
         if (!course) {
             return res.status(404).json({ message: 'Course not found' });
         }
+
+        // Check if user has access to this course
+        if (req.user.role === 'student' && !course.students.includes(req.user.id)) {
+            return res.status(403).json({ message: 'Not enrolled in this course' });
+        }
         
         res.json(course);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Get course error:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Update course
-router.put('/:id', async (req, res) => {
+// @route   PUT /api/courses/:id
+// @desc    Update course
+// @access  Private (Teachers only)
+router.put('/:id', [auth, isTeacher], async (req, res) => {
     try {
-        const course = await Course.findByIdAndUpdate(
+        let course = await Course.findById(req.params.id);
+
+        if (!course) {
+            return res.status(404).json({ message: 'Course not found' });
+        }
+
+        // Make sure user is course teacher
+        if (course.teacher.toString() !== req.user.id) {
+            return res.status(403).json({ message: 'Not authorized to update this course' });
+        }
+
+        course = await Course.findByIdAndUpdate(
             req.params.id,
             req.body,
             { new: true, runValidators: true }
         );
 
-        if (!course) {
-            return res.status(404).json({ message: 'Course not found' });
-        }
-
         res.json(course);
     } catch (error) {
+        console.error('Update course error:', error);
         res.status(400).json({ message: error.message });
     }
 });
 
-// Delete course
-router.delete('/:id', async (req, res) => {
+// @route   DELETE /api/courses/:id
+// @desc    Delete course
+// @access  Private (Teachers only)
+router.delete('/:id', [auth, isTeacher], async (req, res) => {
     try {
-        const course = await Course.findByIdAndDelete(req.params.id);
+        const course = await Course.findById(req.params.id);
 
         if (!course) {
             return res.status(404).json({ message: 'Course not found' });
         }
 
+        // Make sure user is course teacher
+        if (course.teacher.toString() !== req.user.id) {
+            return res.status(403).json({ message: 'Not authorized to delete this course' });
+        }
+
+        await course.remove();
         res.json({ message: 'Course deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Delete course error:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Join course (for students)
-router.post('/:id/join', async (req, res) => {
+// @route   POST /api/courses/:id/enroll
+// @desc    Enroll in a course
+// @access  Private (Students only)
+router.post('/:id/enroll', auth, async (req, res) => {
     try {
         const course = await Course.findById(req.params.id);
         
@@ -95,9 +146,10 @@ router.post('/:id/join', async (req, res) => {
         course.students.push(req.user.id);
         await course.save();
 
-        res.json({ message: 'Successfully joined the course' });
+        res.json({ message: 'Successfully enrolled in the course' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Enroll error:', error);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
