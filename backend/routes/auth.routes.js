@@ -19,24 +19,22 @@ const generateToken = (userId) => {
 // @access  Public
 router.post('/register', async (req, res) => {
     try {
-        console.log('Registration request received:', req.body);
         const { name, email, password, role } = req.body;
 
-        if (!name || !email || !password) {
-            console.log('Missing required fields');
-            return res.status(400).json({ 
+        // Validate input
+        if (!name || !email || !password || !role) {
+            return res.status(400).json({
                 success: false,
-                message: 'Please provide name, email and password' 
+                message: 'Please provide all required fields'
             });
         }
 
         // Check if user exists
         let user = await User.findOne({ email });
         if (user) {
-            console.log('User already exists:', email);
-            return res.status(400).json({ 
+            return res.status(400).json({
                 success: false,
-                message: 'User already exists' 
+                message: 'User already exists'
             });
         }
 
@@ -45,20 +43,11 @@ router.post('/register', async (req, res) => {
             name,
             email,
             password,
-            role: role || 'student'
+            role
         });
 
-        try {
-            await user.save();
-            console.log('User saved successfully:', user._id);
-        } catch (saveError) {
-            console.error('Error saving user:', saveError);
-            return res.status(500).json({
-                success: false,
-                message: 'Error creating user',
-                error: saveError.message
-            });
-        }
+        // Save user
+        await user.save();
 
         // Generate token
         const token = generateToken(user._id);
@@ -77,8 +66,7 @@ router.post('/register', async (req, res) => {
         console.error('Registration error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error registering user',
-            error: error.message
+            message: 'Error in user registration'
         });
     }
 });
@@ -90,16 +78,30 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        // Validate input
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide email and password'
+            });
+        }
+
         // Check if user exists
         const user = await User.findOne({ email }).select('+password');
         if (!user) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
         }
 
         // Check password
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
         }
 
         // Generate token
@@ -117,16 +119,15 @@ router.post('/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            message: 'Error logging in',
-            error: error.message
+            message: 'Error logging in'
         });
     }
 });
 
 // @route   GET /api/auth/me
-// @desc    Get current logged in user
+// @desc    Get current user
 // @access  Private
 router.get('/me', auth, async (req, res) => {
     try {
@@ -136,11 +137,10 @@ router.get('/me', auth, async (req, res) => {
             user
         });
     } catch (error) {
-        console.error('Get user error:', error);
-        res.status(500).json({ 
+        console.error('Get current user error:', error);
+        res.status(500).json({
             success: false,
-            message: 'Error getting user data',
-            error: error.message
+            message: 'Error getting current user'
         });
     }
 });

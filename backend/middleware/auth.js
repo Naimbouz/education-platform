@@ -3,33 +3,52 @@ const User = require('../models/User');
 
 const auth = async (req, res, next) => {
     try {
+        console.log('Auth middleware - headers:', req.headers);
+        
         // Get token from header
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-
-        if (!token) {
-            return res.status(401).json({ message: 'No token, authorization denied' });
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.log('No token found in Authorization header');
+            return res.status(401).json({
+                success: false,
+                message: 'No token, authorization denied'
+            });
         }
 
+        // Verify token
         try {
-            // Verify token
+            const token = authHeader.split(' ')[1];
+            console.log('Verifying token:', token);
+            
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-            
-            // Get user from database
-            const user = await User.findById(decoded.id);
-            
+            console.log('Decoded token:', decoded);
+
+            // Get user from token
+            const user = await User.findById(decoded.id).select('-password');
             if (!user) {
-                return res.status(401).json({ message: 'User not found' });
+                console.log('User not found for token');
+                return res.status(401).json({
+                    success: false,
+                    message: 'User not found'
+                });
             }
 
-            // Add user to request
+            console.log('User authenticated:', user.email);
             req.user = user;
             next();
-        } catch (error) {
-            res.status(401).json({ message: 'Token is not valid' });
+        } catch (err) {
+            console.error('Token verification failed:', err);
+            return res.status(401).json({
+                success: false,
+                message: 'Token is not valid'
+            });
         }
-    } catch (error) {
-        console.error('Auth middleware error:', error);
-        res.status(500).json({ message: 'Server Error' });
+    } catch (err) {
+        console.error('Auth middleware error:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
     }
 };
 

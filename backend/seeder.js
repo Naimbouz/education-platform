@@ -54,8 +54,8 @@ const courses = [
     ],
     assignments: [
       {
-        title: 'Portfolio Project',
-        description: 'Create a personal portfolio website',
+        title: 'Build a Website',
+        description: 'Create a simple personal website',
         dueDate: new Date('2024-04-15'),
         points: 100
       }
@@ -64,68 +64,58 @@ const courses = [
 ];
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/education-platform')
-  .then(async () => {
-    console.log('MongoDB connected for seeding...');
-    
-    try {
-      // Clear existing data
-      await User.deleteMany();
-      await Course.deleteMany();
-      console.log('Data cleared...');
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/education-platform', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(async () => {
+  console.log('MongoDB connected...');
+  
+  try {
+    // Clear existing data
+    await User.deleteMany();
+    await Course.deleteMany();
+    console.log('Existing data cleared');
 
-      // Create users
-      const createdUsers = await Promise.all(
-        users.map(async user => {
-          const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash(user.password, salt);
-          return User.create({
-            ...user,
-            password: hashedPassword
-          });
-        })
-      );
-      console.log('Users seeded...');
+    // Hash passwords for all users
+    const hashedUsers = await Promise.all(users.map(async user => {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(user.password, salt);
+      return { ...user, password: hashedPassword };
+    }));
+    console.log('Passwords hashed');
 
-      // Create courses and assign to teacher
-      const teacher = createdUsers.find(user => user.role === 'teacher');
-      const student = createdUsers.find(user => user.role === 'student');
+    // Insert users
+    const createdUsers = await User.insertMany(hashedUsers);
+    console.log('Users seeded');
 
-      await Promise.all(
-        courses.map(async course => {
-          const createdCourse = await Course.create({
-            ...course,
-            teacher: teacher._id,
-            students: [student._id]
-          });
+    // Add user references to courses
+    const teacherId = createdUsers.find(user => user.role === 'teacher')._id;
+    const coursesWithTeacher = courses.map(course => ({
+      ...course,
+      teacher: teacherId
+    }));
 
-          // Update teacher's courses
-          await User.findByIdAndUpdate(
-            teacher._id,
-            { $push: { courses: createdCourse._id } }
-          );
+    // Insert courses
+    await Course.insertMany(coursesWithTeacher);
+    console.log('Courses seeded');
 
-          // Update student's courses
-          await User.findByIdAndUpdate(
-            student._id,
-            { $push: { courses: createdCourse._id } }
-          );
-        })
-      );
-      console.log('Courses seeded...');
+    // Update teacher with course references
+    const createdCourses = await Course.find();
+    await User.findByIdAndUpdate(
+      teacherId,
+      { $push: { courses: { $each: createdCourses.map(course => course._id) } } }
+    );
+    console.log('Teacher updated with course references');
 
-      console.log('Data seeding completed!');
-      console.log('\nYou can now log in with:');
-      console.log('Teacher - Email: teacher@example.com, Password: password123');
-      console.log('Student - Email: student@example.com, Password: password123');
-      
-      process.exit(0);
-    } catch (error) {
-      console.error('Error seeding data:', error);
-      process.exit(1);
-    }
-  })
-  .catch(err => {
-    console.error('MongoDB connection error:', err);
+    console.log('Database seeded successfully');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error seeding database:', error);
     process.exit(1);
-  });
+  }
+})
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1);
+});
