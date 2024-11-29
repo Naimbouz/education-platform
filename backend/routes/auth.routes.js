@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
-// Register user
+// @route   POST /api/auth/register
+// @desc    Register a user
+// @access  Public
 router.post('/register', async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
@@ -15,12 +18,18 @@ router.post('/register', async (req, res) => {
         }
 
         // Create user
-        user = await User.create({
+        user = new User({
             name,
             email,
             password,
-            role
+            role: role || 'student'
         });
+
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+
+        await user.save();
 
         // Create token
         const token = jwt.sign(
@@ -40,11 +49,14 @@ router.post('/register', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Register error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
-// Login user
+// @route   POST /api/auth/login
+// @desc    Login user
+// @access  Public
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -56,7 +68,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Check password
-        const isMatch = await user.matchPassword(password);
+        const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -67,6 +79,9 @@ router.post('/login', async (req, res) => {
             process.env.JWT_SECRET || 'secret',
             { expiresIn: '30d' }
         );
+
+        // Remove password from response
+        user.password = undefined;
 
         res.json({
             success: true,
@@ -79,7 +94,21 @@ router.post('/login', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// @route   GET /api/auth/me
+// @desc    Get current user
+// @access  Private
+router.get('/me', async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        res.json(user);
+    } catch (error) {
+        console.error(error.message);
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
