@@ -35,10 +35,6 @@ router.post('/register', async (req, res) => {
             role: role || 'student'
         });
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
-
         await user.save();
 
         // Generate token
@@ -73,8 +69,8 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        // Check password
-        const isMatch = await bcrypt.compare(password, user.password);
+        // Check password using the matchPassword method
+        const isMatch = await user.matchPassword(password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
