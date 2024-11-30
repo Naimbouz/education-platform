@@ -18,8 +18,10 @@ const CourseDetails = () => {
                     return;
                 }
 
+                console.log('Fetching course with ID:', id);
                 axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
                 const response = await axios.get(`http://localhost:5000/api/courses/${id}`);
+                console.log('Course data:', response.data);
                 setCourse(response.data);
                 setLoading(false);
             } catch (error) {
@@ -29,19 +31,71 @@ const CourseDetails = () => {
             }
         };
 
-        fetchCourse();
+        if (id) {
+            fetchCourse();
+        }
     }, [id, navigate]);
 
+    const handleBack = () => {
+        navigate('/dashboard');
+    };
+
     if (loading) {
-        return <div className="text-center p-4">Loading...</div>;
+        return (
+            <div className="min-h-screen bg-gray-100 py-6">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mb-6">
+                        <button
+                            onClick={handleBack}
+                            className="text-blue-600 hover:text-blue-800 flex items-center"
+                        >
+                            ← Back to Dashboard
+                        </button>
+                    </div>
+                    <div className="flex justify-center items-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     if (error) {
-        return <div className="text-red-500 text-center p-4">{error}</div>;
+        return (
+            <div className="min-h-screen bg-gray-100 py-6">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mb-6">
+                        <button
+                            onClick={handleBack}
+                            className="text-blue-600 hover:text-blue-800 flex items-center"
+                        >
+                            ← Back to Dashboard
+                        </button>
+                    </div>
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        {error}
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     if (!course) {
-        return <div className="text-center p-4">Course not found</div>;
+        return (
+            <div className="min-h-screen bg-gray-100 py-6">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mb-6">
+                        <button
+                            onClick={handleBack}
+                            className="text-blue-600 hover:text-blue-800 flex items-center"
+                        >
+                            ← Back to Dashboard
+                        </button>
+                    </div>
+                    <div className="text-center p-4">Course not found</div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -49,7 +103,7 @@ const CourseDetails = () => {
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-6">
                     <button
-                        onClick={() => navigate('/dashboard')}
+                        onClick={handleBack}
                         className="text-blue-600 hover:text-blue-800 flex items-center"
                     >
                         ← Back to Dashboard

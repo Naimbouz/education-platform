@@ -12,13 +12,27 @@ const courseSchema = new mongoose.Schema({
         required: [true, 'Please add a description']
     },
     teacher: {
-        type: mongoose.Schema.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },
     students: [{
-        type: mongoose.Schema.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+    }],
+    enrollmentHistory: [{
+        student: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        enrolledAt: {
+            type: Date,
+            default: Date.now
+        },
+        enrolledBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }
     }],
     materials: [{
         title: String,
